@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os.path
+import sys
+
+import six
+
+
+def main() -> int:
+    # some special ones
+    removes = ['from six import callable', 'from six import next']
+    renames = []
+    for move in six._moved_attributes:  # type: ignore
+        if isinstance(move, six.MovedAttribute):
+            if move.name != move.attr:
+                continue
+
+            if move.mod == 'builtins':
+                removes.append(f'from six.moves import {move.name}')
+            else:
+                renames.append(f'six.moves={move.mod}:{move.name}')
+        elif isinstance(move, six.MovedModule):
+            if f'six.moves.{move.name}' == move.mod:
+                renames.append(f'six.moves.{move.name}={move.name}')
+            else:
+                renames.append(f'six.moves.{move.name}={move.mod}')
+        else:
+            raise NotImplementedError(type(move))
+
+    # six.moves.urllib imports urllb.* which doesn't happen with
+    # `import urllib`
+    urllib_index = renames.index('six.moves.urllib=urllib')
+    renames[urllib_index:urllib_index + 1] = [
+        # but imports from submodules are fine
+        f'six.moves.urllib.{submod}=urllib.{submod}'
+        for submod in ('error', 'parse', 'request', 'response', 'robotparser')
+    ]
+
+    # six only exports this on windows
+    renames.append('six.moves.winreg=_winreg')
+
+    # not in six.moves for some reason
+    renames.extend((
+        'six=functools:wraps',
+        'six=io:StringIO',
+        'six=io:BytesIO',
+    ))
+
+    removes_s = ''.join(f'    {r!r},\n' for r in sorted(removes))
+    renames_s = ''.join(f'    {r!r},\n' for r in sorted(renames))
+    print(
+        f'# GENERATED VIA {os.path.basename(sys.argv[0])}\n'
+        f'# Using six=={six.__version__}\n'
+        f'REMOVALS[(3,)].update((\n{removes_s}))\n'
+        f'REPLACES[(3,)].update((\n{renames_s}))\n'
+        f'# END GENERATED\n',
+    )
+
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import collections
+import os
+import sys
+from importlib.metadata import version
+
+import flake8_typing_imports
+import mypy_extensions
+import typing_extensions
+
+
+# --- typing_extensions notes ---
+# https://typing-extensions.readthedocs.io/en/latest/#
+# - Starting with Python 3.9, get_type_hints() has the include_extra parameter
+# - get_origin and get_args lack support for Annotated in Python 3.8
+#   and lack support for ParamSpecArgs and ParamSpecKwargs in 3.9.
+# - Literal had several bugs in Python 3.8 and 3.9,
+#   which were fixed in Python 3.10.
+#   typing_extensions backports the bugfixes to earlier versions.
+# - NewType was reimplemented as a class rather than a function in Python 3.10,
+#   meaning newtypes are pickleable on 3.10+; typing_extensions backports this.
+# - @final was changed in Python 3.11 to set the .__final__ attribute
+# - @overload was changed in Python 3.11 to make function overloads
+#   introspectable at runtime.
+# - Any was change in Python 3.11 so it can be used as a base class
+# - From 3.11, NamedTuple and TypedDict can inherit from Generic;
+#   from 3.12 onwards, the __orig_bases__ attribute
+#   is properly set on NamedTuple and TypedDict classes.
+#   From 3.13 onwards, TypedDict fields can be marked as `ReadOnly`.
+# - The frozen_default parameter was added to dataclass_transform in py312
+# - isinstance() checks are 20x faster or more for runtime-checkable protocols
+#   on py312; typing_extensions backports the performance improvement.
+#   It also backports several bugfixes from early py312 patch releases.
+# - The repr of Unpack was changed in py312 as part of PEP 692;
+#   typing_extensions backports this
+# - Python 3.12 adds the PEP 695 infer_variance parameter for TypeVar.
+# - The PEP 696 default parameter for TypeVar, TypeVarTuple, and ParamSpec
+#   has been added in Python 3.13.
+# - (Async)Generator now has a default value for all type parameters except
+#   the first one on py313+, and (Async)ContextManager now has an optional
+#   second parameter with a default value; typing_extensions backports these
+#   changes.
+CUSTOM_TYPING_EXT_SYMBOLS = {
+    (3, 9): {'get_type_hints'},
+    (3, 10): {'get_origin', 'get_args', 'Literal', 'NewType'},
+    (3, 11): {'Any', 'final', 'overload'},
+    (3, 12): {
+        'SupportsInt', 'SupportsFloat', 'SupportsComplex',
+        'SupportsBytes', 'SupportsAbs', 'SupportsRound', 'NamedTuple',
+        'Unpack', 'dataclass_transform', 'SupportsIndex',
+    },
+    (3, 13): {
+        'AsyncContextManager', 'ContextManager', 'AsyncGenerator', 'Generator',
+        'TypeVar', 'TypeVarTuple', 'ParamSpec', 'TypedDict', 'Protocol',
+        'runtime_checkable',
+    },
+}
+
+
+def main() -> int:
+    flake8_typing_imports_version = version('flake8-typing-imports')
+    mypy_extensions_version = version('mypy_extensions')
+    typing_extensions_version = version('typing_extensions')
+
+    mypy_extensions_all = frozenset(
+        a for a in dir(mypy_extensions) if a != 'Any'
+    )
+    typing_extensions_all = frozenset(typing_extensions.__all__) - {
+        sym for v in CUSTOM_TYPING_EXT_SYMBOLS.values() for sym in v
+    }
+
+    # some attrs are removed and then added back
+    min_contiguous_versions: dict[str, flake8_typing_imports.Version] = {}
+    for v, attrs in flake8_typing_imports.SYMBOLS:
+        for removed in set(min_contiguous_versions) - attrs:
+            del min_contiguous_versions[removed]
+
+        for attr in attrs:
+            min_contiguous_versions.setdefault(attr, v)
+
+    symbols = collections.defaultdict(set)
+    for a, v in min_contiguous_versions.items():
+        symbols[v].add(a)
+
+    # --pyXX-plus assumes the min --pyXX so group symbols by their
+    # rounded up major version
+    symbols_rounded_up: dict[tuple[int, int], set[str]]
+    symbols_rounded_up = collections.defaultdict(set)
+    for v, attrs in sorted(symbols.items()):
+        symbols_rounded_up[v.major, v.minor + int(v.patch != 0)] |= attrs
+
+    # combine 3.5 and 3.6 because this lib is 3.7+
+    symbols_rounded_up[(3, 6)] |= symbols_rounded_up.pop((3, 5))
+
+    deltas = collections.defaultdict(set)
+    prev: set[str] = set()
+    for v, attrs in sorted(symbols_rounded_up.items()):
+        deltas[v] = attrs - prev
+        prev = attrs
+
+    replaces: dict[tuple[int, int], set[str]] = collections.defaultdict(set)
+    for v, attrs in deltas.items():
+        replaces[v] |= {
+            f'mypy_extensions=typing:{s}'
+            for s in attrs & mypy_extensions_all
+        } | {
+            f'typing_extensions=typing:{s}'
+            for s in attrs & typing_extensions_all
+        }
+    for v, attrs in CUSTOM_TYPING_EXT_SYMBOLS.items():
+        replaces[v] |= {f'typing_extensions=typing:{s}' for s in attrs}
+
+    print(f'# GENERATED VIA {os.path.basename(sys.argv[0])}')
+    print('# Using:')
+    print(f'#     flake8-typing-imports=={flake8_typing_imports_version}')
+    print(f'#     mypy-extensions=={mypy_extensions_version}')
+    print(f'#     typing-extensions=={typing_extensions_version}')
+
+    for k, v in sorted(replaces.items()):
+        if not v:
+            continue
+        print(f'REPLACES[{k}].update((')
+        for replace in sorted(v):
+            print(f'    {replace!r},')
+        print('))')
+
+    print('# END GENERATED')
+
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
