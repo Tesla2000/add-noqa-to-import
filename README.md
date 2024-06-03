@@ -56,7 +56,7 @@ Sample `.pre-commit-config.yaml`
 ```python
 import sys
 import pyramid
-import reorder_python_imports
+import add_noqa_to_import
 ```
 
 becomes (stdlib, third party, first party)
@@ -66,7 +66,7 @@ import sys
 
 import pyramid
 
-import reorder_python_imports
+import add_noqa_to_import
 ```
 
 ### `import` imports before `from` imports
@@ -129,13 +129,13 @@ except ImportError:
     pass
 ```
 
-
 ```python
 import sys
 
-import reorder_python_imports
+import add_noqa_to_import
 
 import matplotlib  # noreorder
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 ```
@@ -144,7 +144,7 @@ import matplotlib.pyplot as plt
 # noreorder
 import sys
 import pyramid
-import reorder_python_imports
+import add_noqa_to_import
 ```
 
 ## why this style?

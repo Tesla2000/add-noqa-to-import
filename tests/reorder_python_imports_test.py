@@ -8,15 +8,15 @@ from unittest import mock
 import pytest
 from classify_imports import Settings
 
-from reorder_python_imports import apply_import_sorting
-from reorder_python_imports import fix_file_contents
-from reorder_python_imports import main
-from reorder_python_imports import parse_imports
-from reorder_python_imports import partition_source
-from reorder_python_imports import remove_duplicated_imports
-from reorder_python_imports import Replacements
-from reorder_python_imports import Tok
-from reorder_python_imports import TOKENIZE
+from add_noqa_to_import import add_noqa_to_imports
+from add_noqa_to_import import fix_file_contents
+from add_noqa_to_import import main
+from add_noqa_to_import import parse_imports
+from add_noqa_to_import import partition_source
+from add_noqa_to_import import remove_duplicated_imports
+from add_noqa_to_import import Replacements
+from add_noqa_to_import import Tok
+from add_noqa_to_import import TOKENIZE
 
 
 @pytest.fixture
@@ -434,12 +434,12 @@ def test_remove_duplicated_imports(imports, expected):
 
 
 def test_apply_import_sorting_trivial():
-    assert apply_import_sorting(parse_imports([], to_add=())) == []
+    assert add_noqa_to_imports(parse_imports([], to_add=())) == []
 
 
 def test_apply_import_sorting_all_types():
     imports = ['import os\n']
-    assert apply_import_sorting(parse_imports(imports, to_add=())) == imports
+    assert add_noqa_to_imports(parse_imports(imports, to_add=())) == imports
 
 
 def test_apply_import_sorting_sorts_imports():
@@ -464,7 +464,7 @@ def test_apply_import_sorting_sorts_imports():
         'import reorder_python_imports\n',
         'from reorder_python_imports import main\n',
     ]
-    assert apply_import_sorting(parse_imports(imports, to_add=())) == expected
+    assert add_noqa_to_imports(parse_imports(imports, to_add=())) == expected
 
 
 def test_apply_import_sorting_sorts_imports_with_application_module():
@@ -479,7 +479,7 @@ def test_apply_import_sorting_sorts_imports_with_application_module():
         'import _c_module\n',
         'import reorder_python_imports\n',
     ]
-    ret = apply_import_sorting(
+    ret = add_noqa_to_imports(
         parse_imports(imports, to_add=()),
         settings=Settings(unclassifiable_application_modules=('_c_module',)),
     )
@@ -488,7 +488,7 @@ def test_apply_import_sorting_sorts_imports_with_application_module():
 
 def test_apply_import_sorting_maintains_comments():
     imports = ['import foo  # noqa\n']
-    assert apply_import_sorting(parse_imports(imports)) == imports
+    assert add_noqa_to_imports(parse_imports(imports)) == imports
 
 
 @pytest.mark.parametrize('s', ('', '\n', '\n\n\n'))

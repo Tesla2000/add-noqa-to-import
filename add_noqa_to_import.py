@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import collections
 import enum
 import io
@@ -14,10 +13,15 @@ from typing import NamedTuple
 from typing import Sequence
 
 from classify_imports import Import
-from classify_imports import import_obj_from_str
 from classify_imports import ImportFrom
-from classify_imports import Settings
-from classify_imports import sort
+from classify_imports import import_obj_from_str
+
+
+class Settings(NamedTuple):
+    application_directories: tuple[str, ...] = ('.',)
+    unclassifiable_application_modules: frozenset[str] = frozenset()
+    maximal_line_length: int = 79
+
 
 CodeType = enum.Enum('CodeType', 'PRE_IMPORT_CODE IMPORT NON_CODE CODE')
 
@@ -127,9 +131,9 @@ def partition_source(src: str) -> tuple[str, list[str], str, str]:
 
 
 def parse_imports(
-        imports: list[str],
-        *,
-        to_add: tuple[str, ...] = (),
+    imports: list[str],
+    *,
+    to_add: tuple[str, ...] = (),
 ) -> list[tuple[str, Import | ImportFrom]]:
     ret = []
 
@@ -163,109 +167,15 @@ class Replacements(NamedTuple):
 
                 # for example `six.moves.urllib.request=urllib.request`
                 if (
-                        mod_from_attr and
-                        mod_to_base and
-                        mod_from_attr == mod_to_attr
+                    mod_from_attr and
+                    mod_to_base and
+                    mod_from_attr == mod_to_attr
                 ):
                     exact[mod_from_base, mod_from_attr] = mod_to_base
 
                 mods[mod_from] = mod_to
 
         return cls(exact=exact, mods=mods)
-
-
-def replace_imports(
-        imports: list[tuple[str, Import | ImportFrom]],
-        to_replace: Replacements,
-) -> list[tuple[str, Import | ImportFrom]]:
-    ret = []
-
-    for s, import_obj in imports:
-        if isinstance(import_obj, Import):
-            mod, asname = import_obj.key
-            if asname:
-                if mod in to_replace.mods:
-                    node_i = ast.Import(
-                        names=[ast.alias(to_replace.mods[mod], asname)],
-                    )
-                    obj_i = Import(node_i)
-                    ret.append((str(obj_i), obj_i))
-                else:
-                    for mod_name in _module_to_base_modules(mod):
-                        if mod_name in to_replace.mods:
-                            new_mod = to_replace.mods[mod_name]
-                            new_mod_s = f'{new_mod}{mod[len(mod_name):]}'
-                            node_i = ast.Import(
-                                names=[ast.alias(new_mod_s, asname)],
-                            )
-                            obj_i = Import(node_i)
-                            ret.append((str(obj_i), obj_i))
-                            break
-                    else:
-                        ret.append((s, import_obj))
-            else:
-                ret.append((s, import_obj))
-        else:
-            mod, symbol, asname = import_obj.key
-            mod_symbol = f'{mod}.{symbol}'
-
-            # from a.b.c import d => from e.f.g import d
-            if (mod, symbol) in to_replace.exact:
-                node = ast.ImportFrom(
-                    module=to_replace.exact[mod, symbol],
-                    names=import_obj.node.names,
-                    level=0,
-                )
-                obj = ImportFrom(node)
-                ret.append((str(obj), obj))
-            # from a.b.c import d as e => from f import g as e
-            # from a.b.c import d as e => import f as e
-            # from a.b import c => import c
-            elif (
-                    mod_symbol in to_replace.mods and
-                    (asname or to_replace.mods[mod_symbol] == symbol)
-            ):
-                new_mod = to_replace.mods[mod_symbol]
-                new_mod, dot, new_sym = new_mod.rpartition('.')
-                if new_mod:
-                    node = ast.ImportFrom(
-                        module=new_mod,
-                        names=[ast.alias(new_sym, asname)],
-                        level=0,
-                    )
-                    obj = ImportFrom(node)
-                    ret.append((str(obj), obj))
-                elif not dot:
-                    node_i = ast.Import(names=[ast.alias(new_sym, asname)])
-                    obj_i = Import(node_i)
-                    ret.append((str(obj_i), obj_i))
-                else:
-                    ret.append((s, import_obj))
-            # from a.b.c import d => from e import d
-            elif mod in to_replace.mods:
-                node = ast.ImportFrom(
-                    module=to_replace.mods[mod],
-                    names=import_obj.node.names,
-                    level=0,
-                )
-                obj = ImportFrom(node)
-                ret.append((str(obj), obj))
-            else:
-                for mod_name in _module_to_base_modules(mod):
-                    if mod_name in to_replace.mods:
-                        new_mod = to_replace.mods[mod_name]
-                        node = ast.ImportFrom(
-                            module=f'{new_mod}{mod[len(mod_name):]}',
-                            names=import_obj.node.names,
-                            level=0,
-                        )
-                        obj = ImportFrom(node)
-                        ret.append((str(obj), obj))
-                        break
-                else:
-                    ret.append((s, import_obj))
-
-    return ret
 
 
 def _module_to_base_modules(s: str) -> Generator[str, None, None]:
@@ -279,9 +189,9 @@ def _module_to_base_modules(s: str) -> Generator[str, None, None]:
 
 
 def remove_duplicated_imports(
-        imports: list[tuple[str, Import | ImportFrom]],
-        *,
-        to_remove: set[tuple[str, ...]],
+    imports: list[tuple[str, Import | ImportFrom]],
+    *,
+    to_remove: set[tuple[str, ...]],
 ) -> list[tuple[str, Import | ImportFrom]]:
     seen = set(to_remove)
     seen_module_names: set[str] = set()
@@ -291,8 +201,8 @@ def remove_duplicated_imports(
         if import_obj.key not in seen:
             seen.add(import_obj.key)
             if (
-                    isinstance(import_obj, Import) and
-                    not import_obj.key.asname
+                isinstance(import_obj, Import) and
+                not import_obj.key.asname
             ):
                 seen_module_names.update(
                     _module_to_base_modules(import_obj.module),
@@ -302,9 +212,9 @@ def remove_duplicated_imports(
     ret = []
     for s, import_obj in without_exact_duplicates:
         if (
-                isinstance(import_obj, Import) and
-                not import_obj.key.asname and
-                import_obj.key.module in seen_module_names
+            isinstance(import_obj, Import) and
+            not import_obj.key.asname and
+            import_obj.key.module in seen_module_names
         ):
             continue
         ret.append((s, import_obj))
@@ -312,36 +222,28 @@ def remove_duplicated_imports(
     return ret
 
 
-def apply_import_sorting(
-        imports: list[tuple[str, Import | ImportFrom]],
-        settings: Settings = Settings(),
+def add_noqa_to_imports(
+    imports: list[str], settings: Settings = Settings(),
 ) -> list[str]:
-    import_obj_to_s = {v: s for s, v in imports}
+    def add_noqa_to_import(import_: str) -> str:
+        import_lines = import_.splitlines()
+        first_line = import_lines[0].rstrip()
+        if len(first_line) <= settings.maximal_line_length or "#" in first_line:
+            return import_
+        if first_line.startswith("from ") and first_line.endswith("import ("):
+            first_line += "  # noqa: E501"
+        elif first_line.startswith("import "):
+            first_line += "  # noqa: E501"
+        import_lines[0] = first_line
+        return "\n".join(import_lines) + "\n"
 
-    sorted_blocks = sort(import_obj_to_s, settings=settings)
-
-    new_imports = []
-    for block in sorted_blocks:
-        for import_obj in block:
-            new_imports.append(import_obj_to_s[import_obj])
-
-        new_imports.append('\n')
-
-    # XXX: I want something like [x].join(...) (like str join) but for now
-    # this works
-    if new_imports:
-        new_imports.pop()
-
-    return new_imports
+    return list(map(add_noqa_to_import, imports))
 
 
 def fix_file_contents(
-        contents: str,
-        *,
-        to_add: tuple[str, ...] = (),
-        to_remove: set[tuple[str, ...]],
-        to_replace: Replacements,
-        settings: Settings = Settings(),
+    contents: str,
+    *,
+    settings: Settings = Settings(),
 ) -> str:
     if not contents or contents.isspace():
         return ''
@@ -349,21 +251,16 @@ def fix_file_contents(
     # internally use `'\n` as the newline and normalize at the very end
     before, imports, after, nl = partition_source(contents)
 
-    parsed = parse_imports(imports, to_add=to_add)
-    parsed = replace_imports(parsed, to_replace=to_replace)
-    parsed = remove_duplicated_imports(parsed, to_remove=to_remove)
-    imports = apply_import_sorting(parsed, settings=settings)
+    imports = add_noqa_to_imports(imports, settings=settings)
 
     return f'{before}{"".join(imports)}{after}'.replace('\n', nl)
 
 
 def _fix_file(
-        filename: str,
-        args: argparse.Namespace,
-        *,
-        to_remove: set[tuple[str, ...]],
-        to_replace: Replacements,
-        settings: Settings = Settings(),
+    filename: str,
+    args: argparse.Namespace,
+    *,
+    settings: Settings = Settings(),
 ) -> int:
     if filename == '-':
         contents_bytes = sys.stdin.buffer.read()
@@ -381,9 +278,6 @@ def _fix_file(
 
     new_contents = fix_file_contents(
         contents,
-        to_add=tuple(f'{s.strip()}\n' for s in args.add_import),
-        to_remove=to_remove,
-        to_replace=to_replace,
         settings=settings,
     )
     if filename == '-':
@@ -744,6 +638,8 @@ REPLACES[(3,)].update((
     'pipes=shlex:quote',
     'xml.etree.cElementTree=xml.etree.ElementTree',
 ))
+
+
 # END GENERATED
 
 
@@ -763,27 +659,6 @@ def _add_version_options(parser: argparse.ArgumentParser) -> None:
         )
 
 
-def _validate_import(s: str) -> str:
-    try:
-        import_obj_from_str(s)
-    except (SyntaxError, KeyError):
-        raise argparse.ArgumentTypeError(f'expected import: {s!r}')
-    else:
-        return s
-
-
-def _validate_replace_import(s: str) -> tuple[str, str, str]:
-    mods, _, attr = s.partition(':')
-    try:
-        orig_mod, new_mod = mods.split('=')
-    except ValueError:
-        raise argparse.ArgumentTypeError(
-            f'expected `orig.mod=new.mod` or `orig.mod=new.mod:attr`: {s!r}',
-        )
-    else:
-        return orig_mod, new_mod, attr
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -792,32 +667,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument('--exit-zero-even-if-changed', action='store_true')
     parser.add_argument(
-        '--add-import', action='append', default=[], type=_validate_import,
-        help='Import to add to each file.  Can be specified multiple times.',
-    )
-    parser.add_argument(
-        '--remove-import', action='append', default=[], type=_validate_import,
-        help=(
-            'Import to remove from each file.  '
-            'Can be specified multiple times.'
-        ),
-    )
-    parser.add_argument(
-        '--replace-import', action='append', default=[],
-        type=_validate_replace_import,
-        help=(
-            'Module pairs to replace imports. '
-            'For example: `--replace-import orig.mod=new.mod`.  '
-            'For renames of a specific imported attribute, use the form '
-            '`--replace-import orig.mod=new.mod:attr`.  '
-            'Can be specified multiple times.'
-        ),
-    )
-    parser.add_argument(
         '--application-directories', default='.',
         help=(
             'Colon separated directories that are considered top-level '
             'application directories.  Defaults to `%(default)s`'
+        ),
+    )
+    parser.add_argument(
+        '--maximal-line-length', default=79,
+        help=(
+            'Maximal line length specified by flake'
         ),
     )
     parser.add_argument(
@@ -835,25 +694,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    to_remove = {
-        obj.key
-        for s in args.remove_import
-        for obj in import_obj_from_str(s).split()
-    } | {
-        import_obj_from_str(s).key
-        for k, v in REMOVALS.items()
-        if args.min_version >= k
-        for s in v
-    }
-
-    for k, v in REPLACES.items():
-        if args.min_version >= k:
-            args.replace_import.extend(
-                _validate_replace_import(replace_s) for replace_s in v
-            )
-
-    to_replace = Replacements.make(args.replace_import)
-
     if os.environ.get('PYTHONPATH'):
         sys.stderr.write('$PYTHONPATH set, import order may be unexpected\n')
         sys.stderr.flush()
@@ -861,6 +701,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings = Settings(
         application_directories=tuple(args.application_directories.split(':')),
         unclassifiable_application_modules=frozenset(args.unclassifiable),
+        maximal_line_length=int(args.maximal_line_length),
     )
 
     retv = 0
@@ -868,8 +709,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         retv |= _fix_file(
             filename,
             args,
-            to_remove=to_remove,
-            to_replace=to_replace,
             settings=settings,
         )
     return retv
