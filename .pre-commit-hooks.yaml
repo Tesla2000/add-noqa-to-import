@@ -1,7 +1,7 @@
--   id: reorder-python-imports
-    name: Reorder python imports
-    description: This hook reorders imports in python files.
-    entry: reorder-python-imports
+-   id: add-noqa-imports
+    name: Add noqa imports
+    description: This hook adds noqa to imports that can't be made shorter due to a long path.
+    entry: add-noqa-to-imports
     language: python
     types: [python]
     # for backward compatibility
