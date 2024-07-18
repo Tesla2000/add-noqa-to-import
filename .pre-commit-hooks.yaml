@@ -1,4 +1,4 @@
--   id: add-noqa-imports
+-   id: add-noqa-to-import
     name: Add noqa imports
     description: This hook adds noqa to imports that can't be made shorter due to a long path.
     entry: add-noqa-to-import
