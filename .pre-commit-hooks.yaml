@@ -1,7 +1,7 @@
 -   id: add-noqa-imports
     name: Add noqa imports
     description: This hook adds noqa to imports that can't be made shorter due to a long path.
-    entry: python add_noqa_to_import.py
+    entry: add-noqa-to-import
     language: python
     types: [python]
     # for backward compatibility
