@@ -11,7 +11,6 @@ from libcst import Module, Comment, FlattenSentinel, RemovalSentinel, \
 
 class Settings(NamedTuple):
     application_directories: tuple[str, ...] = ('.',)
-    unclassifiable_application_modules: frozenset[str] = frozenset()
     maximal_line_length: int = 79
 
 
@@ -65,22 +64,6 @@ class AddImportTransformer(cst.CSTTransformer):
         return self._set_path_attrs(updated_node, ["trailing_whitespace"], comment=Comment(
             value='# noqa: E501'), whitespace=SimpleWhitespace("  "))
 
-    def leave_Import(self, original_node: cst.ImportFrom,
-                     updated_node: cst.ImportFrom) -> cst.ImportFrom:
-        str_code = self.module.code_for_node(original_node)
-        if len(str_code.splitlines()[0]) <= self.settings.maximal_line_length:
-            return updated_node
-        return updated_node
-        comment_path = ["lpar", "whitespace_after", "first_line", "comment"]
-        if self._get_path_attrs(original_node, comment_path):
-            return updated_node
-        if self._get_path_attrs(original_node, comment_path[:-1]):
-            return self._set_path_attrs(original_node, comment_path[:-1],
-                                        comment=Comment("#  noqa: E501"))
-        if len(original_node.names) > 1:
-            return updated_node
-        return updated_node.lpar.with_changes(children=new_children)
-
     def _get_path_attrs(self, elem, attrs: Sequence[str]):
         current_elem = elem
         for attr in attrs:
@@ -101,10 +84,6 @@ class AddImportTransformer(cst.CSTTransformer):
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        'filenames', nargs='*',
-        help='If `-` is given, reads from stdin and writes to stdout.',
-    )
     parser.add_argument(
         '--application-directories', default='.',
         help=(
