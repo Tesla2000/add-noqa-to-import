@@ -61,10 +61,10 @@ class AddImportTransformer(cst.CSTTransformer):
         return updated_node
 
     def leave_SimpleStatementLine(
-        self, original_node: "SimpleStatementLine",
-        updated_node: "SimpleStatementLine"
+        self, original_node: cst.SimpleStatementLine,
+        updated_node: cst.SimpleStatementLine
     ) -> Union[
-        "BaseStatement", FlattenSentinel["BaseStatement"], RemovalSentinel]:
+        cst.BaseStatement, FlattenSentinel[cst.BaseStatement], RemovalSentinel]:
         str_code = self.module.code_for_node(original_node)
         if len(str_code.splitlines()[0]) <= self.settings.maximal_line_length:
             return updated_node
