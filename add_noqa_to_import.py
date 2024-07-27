@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import NamedTuple, Union
 from typing import Sequence
 
@@ -15,6 +16,20 @@ class Settings(NamedTuple):
 
 
 def fix_imports(
+    filename: str,
+    *,
+    settings: Settings = Settings(),
+) -> str:
+    file_path = Path(filename)
+    original_code = file_path.read_text()
+    fixed_code = _fix_imports(original_code, settings)
+    if original_code != fixed_code:
+        file_path.write_text(fixed_code)
+        return 1
+    return 0
+
+
+def _fix_imports(
     code: str,
     *,
     settings: Settings = Settings(),
@@ -116,7 +131,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == '__main__':
-    fix_imports(
-        code="""def hello_world():
-    print("Hello, world!")""")
-    # raise SystemExit(main())
+    raise SystemExit(main())
