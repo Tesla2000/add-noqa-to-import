@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Added noqa E501 automatically for not splitable import statements"
 authors = ["Tesla2000 <fratajczak124@gmail.com>"]
 readme = "README.md"
-authors = ["Filip Ratajczak <fratajczak124@gmail.com>"]
 license = "MIT"
 homepage = "https://github.com/Tesla2000/suppress-lenght-check-import"
 repository = "https://github.com/Tesla2000/suppress-lenght-check-import"
