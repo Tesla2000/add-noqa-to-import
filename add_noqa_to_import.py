@@ -16,7 +16,6 @@ class Settings(NamedTuple):
 
 def fix_imports(
     filename: str,
-    *,
     settings: Settings = Settings(),
 ) -> str:
     file_path = Path(filename)
@@ -30,7 +29,6 @@ def fix_imports(
 
 def _fix_imports(
     code: str,
-    *,
     settings: Settings = Settings(),
 ) -> str:
     module = cst.parse_module(code)
