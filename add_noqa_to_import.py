@@ -11,7 +11,6 @@ from libcst import Module, Comment, FlattenSentinel, RemovalSentinel, \
 
 
 class Settings(NamedTuple):
-    application_directories: tuple[str, ...] = ('.',)
     maximal_line_length: int = 79
 
 
@@ -99,12 +98,10 @@ class AddImportTransformer(cst.CSTTransformer):
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
-        '--application-directories', default='.',
-        help=(
-            'Colon separated directories that are considered top-level '
-            'application directories.  Defaults to `%(default)s`'
-        ),
+        'filenames', nargs='*',
+        help='If `-` is given, reads from stdin and writes to stdout.',
     )
     parser.add_argument(
         '--maximal-line-length', default=79,
@@ -116,8 +113,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     settings = Settings(
-        application_directories=tuple(args.application_directories.split(':')),
-        unclassifiable_application_modules=frozenset(args.unclassifiable),
         maximal_line_length=int(args.maximal_line_length),
     )
 
