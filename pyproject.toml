@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "add-noqa-to-imports"
+name = "add-noqa-to-import"
 version = "0.1.0"
 description = "Added noqa E501 automatically for not splitable import statements"
 authors = ["Tesla2000 <fratajczak124@gmail.com>"]
