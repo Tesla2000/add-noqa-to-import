@@ -18,11 +18,14 @@ def fix_imports(
     filename: str,
     settings: Settings = Settings(),
 ) -> str:
+    if not filename.endswith(".py"):
+        return 0
     file_path = Path(filename)
     original_code = file_path.read_text()
     fixed_code = _fix_imports(original_code, settings)
     if original_code != fixed_code:
         file_path.write_text(fixed_code)
+        print(f"Added noqa: E501 to imports in {filename}")
         return 1
     return 0
 
