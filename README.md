@@ -5,7 +5,7 @@ Suppress length check can be used to automatically annotate too long import stat
 ### .pre-commit-config
 ```
 repos:
-  - repo: https://github.com/Tesla2000/suppress-lenght-check-import
+  - repo: https://github.com/Tesla2000/add-noqa-to-import
     rev: '0.1.1'
     hooks:
       - id: add-noqa-to-import
